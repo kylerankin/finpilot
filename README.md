@@ -272,6 +272,7 @@ Ready to take your custom OS to production? Enable these features for enhanced s
     3. Uncomment the `bootc-build/chunka` step
   - For optimal results, also add `bootc-build/apply-pkg-intervals` and a `pkg-cadence.yml` workflow
   - Status: **Not enabled by default** (optional optimization)
+  - Note: `/usr/libexec/bootc-base-imagectl` is only available on `quay.io/fedora/fedora-bootc` base images. It is **not present** on `ublue-os` base images (`ublue-os/main-nvidia`, `ublue-os/silverblue-main`, etc.). If you are using a ublue-os base image, rechunking is not currently supported. See [#54](https://github.com/projectbluefin/finpilot/issues/54) for discussion.
 
 #### Adding Image Rechunking
 
