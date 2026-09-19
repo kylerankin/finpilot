@@ -80,6 +80,7 @@ sudo-clean:
 # sudoif bash function
 [group('Utility')]
 [private]
+[positional-arguments]
 sudoif command *args:
     #!/usr/bin/bash
     function sudoif(){
@@ -96,7 +97,7 @@ sudoif command *args:
             exit 1
         fi
     }
-    sudoif {{ command }} {{ args }}
+    sudoif "$@"
 
 # This Justfile recipe builds a container image using Podman.
 #

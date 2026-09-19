@@ -176,3 +176,33 @@ run_recipe_without_sudo() {
 	[ "$status" -ne 0 ]
 	[[ "$output" == *"sudoif"* ]]
 }
+
+@test "sudoif: passes whitespace-containing arguments through as single words" {
+	# The dispatcher used to be invoked as `sudoif {{ command }} {{ args }}`,
+	# which word-split every argument before the function saw it. Escalation
+	# here goes through a stub `sudo` that only records its argv, so the test
+	# exercises the invocation without ever gaining privileges.
+	local stub_bin="${SANDBOX}/stub-bin"
+	mkdir -p "${stub_bin}"
+	ln -sf "${SUDOLESS_BIN}"/* "${stub_bin}/"
+
+	printf '#!/usr/bin/env bash\nprintf "[%%s]\\n" "$@" >%s/argv\n' "${SANDBOX}" \
+		>"${stub_bin}/sudo"
+	chmod +x "${stub_bin}/sudo"
+
+	run env -u SSH_ASKPASS -u DISPLAY -u WAYLAND_DISPLAY "PATH=${stub_bin}" \
+		just --justfile "${SANDBOX}/Justfile" --working-directory "${SANDBOX}" \
+		sudoif echo "hello world" plain
+	[ "$status" -eq 0 ]
+
+	if [[ "${UID}" -eq 0 ]]; then
+		skip "root takes the direct-exec branch and never reaches the sudo stub"
+	fi
+
+	[ -f "${SANDBOX}/argv" ]
+	run cat "${SANDBOX}/argv"
+	[ "${lines[0]}" = "[echo]" ]
+	[ "${lines[1]}" = "[hello world]" ]
+	[ "${lines[2]}" = "[plain]" ]
+	[ "${#lines[@]}" -eq 3 ]
+}
