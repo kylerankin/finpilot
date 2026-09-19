@@ -3,7 +3,7 @@
 #
 # The recipes are exercised against a sandbox copy of the Justfile so the real
 # repository is never touched. Every external command the recipes shell out to
-# (podman, skopeo, git, date) is replaced by a stub on PATH that records its
+# (podman, skopeo, date) is replaced by a stub on PATH that records its
 # argv, which lets the tests assert on the argument vector `podman build` would
 # have received without running a container build.
 #
@@ -37,8 +37,6 @@ setup() {
     export STUB_SKOPEO_TAGS='{"Tags":[]}'
     # Exit status of `skopeo list-tags`; non-zero disables the layer cache.
     export STUB_SKOPEO_STATUS=0
-    # Porcelain output of `git status -s`; empty means a clean worktree.
-    export STUB_GIT_STATUS=""
     # JSON `podman inspect` returns; the recipe reads .[].Id out of it.
     export STUB_PODMAN_INSPECT='[{"Id":"sha256:deadbeef"}]'
 
@@ -59,15 +57,6 @@ if [[ "${STUB_SKOPEO_STATUS:-0}" -ne 0 ]]; then
     exit "${STUB_SKOPEO_STATUS}"
 fi
 printf '%s\n' "${STUB_SKOPEO_TAGS}"
-EOF
-
-    cat >"${STUB_BIN}/git" <<'EOF'
-#!/usr/bin/env bash
-case "$1" in
-    status) printf '%s' "${STUB_GIT_STATUS:-}" ;;
-    rev-parse) printf '%s\n' "abc1234" ;;
-esac
-exit 0
 EOF
 
     cat >"${STUB_BIN}/date" <<'EOF'

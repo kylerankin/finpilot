@@ -31,9 +31,14 @@ passed_build_args() {
 }
 
 # Every `ARG NAME` the Containerfile declares, one per line.
+#
+# Both declaration forms must be handled: `ARG NAME=default` and a bare
+# `ARG NAME` with no default. Stripping only the `=...` form leaves the bare
+# form as the literal line `ARG NAME`, which then fails the exact-match check
+# below and reports a legitimately declared arg as undeclared.
 declared_args() {
-    grep -E '^ARG ' "${CONTAINERFILE}" \
-        | sed -E 's/^ARG ([A-Za-z_][A-Za-z0-9_]*)=.*/\1/'
+    grep -E '^ARG[[:space:]]+' "${CONTAINERFILE}" \
+        | sed -E 's/^ARG[[:space:]]+([A-Za-z_][A-Za-z0-9_]*).*/\1/'
 }
 
 @test "the Justfile passes at least one --build-arg" {
@@ -44,12 +49,21 @@ declared_args() {
     [ "$(declared_args | grep -c .)" -ge 1 ]
 }
 
-@test "every --build-arg the Justfile passes is declared as an ARG in the Containerfile" {
-    while IFS= read -r name; do
-        [ -n "${name}" ] || continue
-        [[ "$(declared_args)" == *"${name}"* ]] \
-            || { echo "FAIL: --build-arg ${name} has no ARG declaration"; return 1; }
-    done < <(passed_build_args)
+@test "declared_args reads both ARG forms, with and without a default" {
+    CONTAINERFILE="${BATS_TEST_TMPDIR}/Containerfile"
+    cat >"${CONTAINERFILE}" <<'EOF'
+FROM scratch
+ARG WITH_DEFAULT="value"
+ARG NO_DEFAULT
+ARG	TAB_SEPARATED=1
+RUN echo not-an-arg
+EOF
+    run declared_args
+    [ "${status}" -eq 0 ]
+    [ "${lines[0]}" = "WITH_DEFAULT" ]
+    [ "${lines[1]}" = "NO_DEFAULT" ]
+    [ "${lines[2]}" = "TAB_SEPARATED" ]
+    [ "${#lines[@]}" -eq 3 ]
 }
 
 @test "no --build-arg the Justfile passes is missing from the Containerfile" {

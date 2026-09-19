@@ -102,8 +102,7 @@ sudoif command *args:
 #   $tag - The tag for the image (default: $DEFAULT_TAG).
 #
 # The script constructs the version string using the Fedora major version, tag,
-# and the current date. If the git working directory is clean, it also includes
-# the short SHA of the current HEAD.
+# and the current date.
 #
 # just build $target_image $tag
 #
