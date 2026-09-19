@@ -285,7 +285,7 @@ _build-bib $target_image $tag $type $config: (_rootful_load_image target_image t
     mkdir -p output
     sudo mv -f $BUILDTMP/* output/
     sudo rmdir $BUILDTMP
-    # ponytail: resolve ownership from the kernel, not $USER. $USER is unset in
+    # Resolve ownership from the kernel, not $USER. $USER is unset in
     # container/cron/systemd/env -i shells, so under `set -u` the recipe aborted
     # here after the build finished and left output/ root-owned. Numeric ids are
     # what chown resolves to anyway, so this is behavior-preserving interactively.

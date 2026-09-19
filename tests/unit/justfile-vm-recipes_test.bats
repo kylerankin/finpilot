@@ -196,9 +196,9 @@ run_just() {
 # The dependency recipe is short-circuited via SUDO_USER so these tests only
 # assert on the bootc-image-builder invocation itself.
 #
-# USER is exported only for the legacy path; `_build-bib` now resolves its
-# ownership target from the kernel (`id -u`/`id -g`) instead of `$USER`, so the
-# recipe completes in any environment, including one without USER.
+# USER is deliberately not exported: `_build-bib` resolves its ownership target
+# from the kernel (`id -u`/`id -g`) rather than `$USER`, so the recipe completes
+# in any environment, including one where USER is undefined.
 run_build_bib() {
     SUDO_USER="tester" run_just _build-bib "$@"
 }
