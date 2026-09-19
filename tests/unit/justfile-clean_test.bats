@@ -13,8 +13,9 @@
 # the Justfile with `--working-directory` pointed at the sandbox, so the
 # deletions only ever touch throwaway files. The `sudoif` cases run with a
 # PATH that deliberately contains no `sudo`, which is the branch that must
-# refuse to run anything -- the escalating branches are never exercised, so a
-# test run can never gain privileges.
+# refuse to run anything. The one case that does reach the escalating branch
+# puts a stub `sudo` on PATH that only records its argv, so a test run can
+# never gain privileges.
 
 setup() {
 	REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../.." && pwd)"
