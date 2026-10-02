@@ -58,6 +58,12 @@
       "enabled": false
     },
     {
+      "description": "Keep the Fedora template base on a real release: a Renovate major (e.g. 44->46) lands on Rawhide, not a release, and skips 45. A Fedora rebase is a deliberate, hand-made PR, so disable the major outright — the same as the ubuntu runner above. Re-enable once Fedora 46 branches exist.",
+      "matchDepNames": ["quay.io/fedora-ostree-desktops/*"],
+      "matchUpdateTypes": ["major"],
+      "enabled": false
+    },
+    {
       "description": "A major crossing always waits for a human — never automerge one. Last matching rule wins, so keep this rule last.",
       "matchUpdateTypes": ["major"],
       "automerge": false
