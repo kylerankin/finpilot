@@ -46,6 +46,13 @@
       "automerge": true
     },
     {
+      "description": "Cap the Fedora base at the latest stable major so Renovate advances to the next stable release instead of jumping to the unbounded 'rawhide' tag. With recreateWhen:always and no constraint, quay.io/fedora-ostree-desktops/* recreates an immortal PR aimed at rawhide, skipping 45. Raise the cap when the next Fedora stable becomes the intended target.",
+      "matchDepNames": [
+        "quay.io/fedora-ostree-desktops/*"
+      ],
+      "allowedVersions": "<=45"
+    },
+    {
       "description": "Third-party GitHub Actions execute in workflows holding packages:write and the cosign OIDC signing identity (build-image.yml), so their bumps always wait for a human — an automerged compromised release would run there unreviewed. First-party projectbluefin/** actions stay automerged.",
       "matchManagers": ["github-actions"],
       "matchPackageNames": ["!projectbluefin/**"],
