@@ -30,7 +30,31 @@ main() (
         exit 2
     fi
 
-    flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+    # The Flathub remote descriptor is pinned to a checked-in fixture rather
+    # than fetched from the live URL. build/validate-flatpaks.sh used to run
+    #   flatpak remote-add --user --if-not-exists flathub \
+    #       https://dl.flathub.org/repo/flathub.flatpakrepo
+    # which is an unpinned fetch: anything on the path could substitute the
+    # descriptor and its GPG key. The descriptor is committed here and
+    # verified against its SHA256 before use, so a MITM on the fetch or drift
+    # in the committed copy is caught. Flathub rotates their signing key
+    # periodically, so when they do, refresh this fixture AND the
+    # PINNED_FLATHUB_SHA256 below together (the bats suite fails if they
+    # diverge).
+    PINNED_FLATHUB_SHA256="3371dd250e61d9e1633630073fefda153cd4426f72f4afa0c3373ae2e8fea03a"
+    remote_cfg="${BASH_SOURCE[0]%/*}/../tests/fixtures/flathub.flatpakrepo"
+    if [[ ! -f "${remote_cfg}" ]]; then
+        printf 'FAIL: Flathub remote descriptor not found: %s\n' "${remote_cfg}" >&2
+        exit 1
+    fi
+    actual_sha256=$(sha256sum "${remote_cfg}" | awk '{print $1}')
+    if [[ "${actual_sha256}" != "${PINNED_FLATHUB_SHA256}" ]]; then
+        printf 'FAIL: %s: SHA256 mismatch (expected %s, got %s). Refresh the descriptor and update PINNED_FLATHUB_SHA256.\n' \
+            "${remote_cfg}" "${PINNED_FLATHUB_SHA256}" "${actual_sha256}" >&2
+        exit 1
+    fi
+
+    flatpak remote-add --user --if-not-exists flathub "${remote_cfg}"
 
     workdir=$(mktemp -d)
     trap 'rm -rf -- "${workdir}"' EXIT

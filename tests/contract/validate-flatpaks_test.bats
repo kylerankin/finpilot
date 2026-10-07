@@ -99,10 +99,25 @@ Branch=stable
 EOF
     run bash "${SCRIPT}" "${FIXTURES}"
     [ "${status}" -eq 0 ]
-    run grep -c '^remote-add --user --if-not-exists flathub ' "${CALLS}"
+    # The remote is added from the checked-in fixture, never the live URL: the
+    # whole point of #493 is that the descriptor is pinned, not fetched.
+    run grep -c '^remote-add --user --if-not-exists flathub .*fixtures/flathub.flatpakrepo$' "${CALLS}"
     [ "${output}" = "1" ]
+    run grep -c '^remote-add --user --if-not-exists flathub https://dl.flathub.org' "${CALLS}"
+    [ "${output}" = "0" ]
     run grep -c '^remote-info --user flathub org.gnome.Calculator$' "${CALLS}"
     [ "${output}" = "1" ]
+}
+
+@test "flathub remote descriptor is pinned to its checked-in fixture SHA256" {
+    # The script verifies the descriptor against PINNED_FLATHUB_SHA256 before
+    # adding the remote. Pin that constant to the fixture here so that drift or
+    # a Flathub key rotation is caught in the unit suite rather than failing
+    # validate-flatpaks at PR time with an opaque SHA256 mismatch.
+    fixture="${BATS_TEST_DIRNAME}/../../tests/fixtures/flathub.flatpakrepo"
+    pinned="$(sed -n 's/.*PINNED_FLATHUB_SHA256="\([0-9a-f]\{64\}\)".*/\1/p' "${SCRIPT}")"
+    [[ -n "${pinned}" ]]
+    [[ "$(sha256sum "${fixture}" | awk '{print $1}')" == "${pinned}" ]]
 }
 
 @test "validator accepts blank lines and # comments" {
