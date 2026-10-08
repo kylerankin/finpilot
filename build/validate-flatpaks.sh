@@ -8,7 +8,10 @@
 #     accepts; flatpak logs anything else at g_info level and then discards the
 #     whole file, so malformed syntax looks identical to an empty list
 #   - every [Flatpak Preinstall <app-id>] section must declare a Branch= key
-#   - every declared app-id must resolve on the flathub remote
+#   - every [Flatpak Preinstall <app-id>] section must declare a Branch= key
+#   - every declared app-id and Branch= must resolve on the flathub remote:
+#     the exact APP//BRANCH ref is looked up (a bare app-id falls back to the
+#     remote's default branch, so a typo'd or beta-only Branch= would PASS)
 #
 # Single implementation of the flatpak validation contract; the CI workflow
 # (.github/workflows/validate-flatpaks.yml) and `just validate-flatpaks` are
@@ -83,13 +86,18 @@ main() (
                 continue
             fi
             checked=$((checked + 1))
-            if flatpak remote-info --user flathub "${app_id}" > "${workdir}/output" 2>&1; then
-                printf 'PASS: %s: %s (%s)\n' "${preinstall}" "${app_id}" "${branch#Branch=}"
+            branch_name="${branch#Branch=}"
+            # Look up the exact ref the preinstall will request (APP//BRANCH).
+            # A bare app-id makes `flatpak remote-info` fall back to the remote's
+            # default branch, so a typo'd or beta-only Branch= prints PASS while
+            # the real preinstall later requests a ref that does not exist.
+            if flatpak remote-info --user flathub "${app_id}//${branch_name}" > "${workdir}/output" 2>&1; then
+                printf 'PASS: %s: %s (%s)\n' "${preinstall}" "${app_id}" "${branch_name}"
             else
                 rc=$?
                 failed=$((failed + 1))
-                printf 'FAIL: %s: %s: not on flathub (exit %s)\n' "${preinstall}" "${app_id}" "${rc}" >&2
-                printf 'Command: flatpak remote-info --user flathub %q\n' "${app_id}" >&2
+                printf 'FAIL: %s: %s//%s: not on flathub (exit %s)\n' "${preinstall}" "${app_id}" "${branch_name}" "${rc}" >&2
+                printf 'Command: flatpak remote-info --user flathub %q\n' "${app_id}//${branch_name}" >&2
                 sed 's/^/  /' "${workdir}/output" >&2
             fi
         done < <(sed -n 's/^\[Flatpak Preinstall \(.*\)\]$/\1/p' "${preinstall}")
