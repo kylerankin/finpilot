@@ -4,8 +4,8 @@
 # All runs use a fake flatpak binary, never the host's. The contract under
 # test: every line must be blank, a '#' comment, a [Flatpak Preinstall <app-id>]
 # header, or a key=value pair; every such section must declare Branch=; every
-# app-id is passed to `flatpak remote-info` as data; and an empty discovery
-# result fails closed instead of passing vacuously.
+# app-id and its branch is passed to `flatpak remote-info` as APP//BRANCH data;
+# and an empty discovery result fails closed instead of passing vacuously.
 #
 # Run with: bats tests/contract/validate-flatpaks_test.bats
 
@@ -24,10 +24,11 @@ case "$1" in
     remote-add)
         ;;
     remote-info)
-        # $1=remote-info $2=--user $3=flathub $4=app-id
+        # $1=remote-info $2=--user $3=flathub $4=APP_ID//BRANCH
         [[ $# -eq 4 ]] || exit 99
+        app_id="${4%%//*}"
         case " ${MOCK_REMOTE_FAILURES:-} " in
-            *" $4 "*)
+            *" ${app_id}"*)
                 echo 'error: remote-info failed' >&2
                 exit 42
                 ;;
@@ -77,7 +78,7 @@ Branch=stable
 EOF
     run bash "${SCRIPT}" "${FIXTURES}"
     [ "${status}" -eq 1 ]
-    [[ "${output}" == *"FAIL: ${FIXTURES}/base.preinstall: com.example.Missing: not on flathub (exit 42)"* ]]
+    [[ "${output}" == *"FAIL: ${FIXTURES}/base.preinstall: com.example.Missing//stable: not on flathub (exit 42)"* ]]
 }
 
 @test "validator fails closed when the directory has no preinstall files" {
@@ -101,7 +102,23 @@ EOF
     [ "${status}" -eq 0 ]
     run grep -c '^remote-add --user --if-not-exists flathub ' "${CALLS}"
     [ "${output}" = "1" ]
-    run grep -c '^remote-info --user flathub org.gnome.Calculator$' "${CALLS}"
+    run grep -c '^remote-info --user flathub org.gnome.Calculator//stable$' "${CALLS}"
+    [ "${output}" = "1" ]
+}
+
+@test "validator fails a typo'd Branch= that does not exist on flathub" {
+    # Regression for: remote-info queried with a bare app-id fell back to the
+    # remote's default branch and printed PASS for a branch that never resolves.
+    export MOCK_REMOTE_FAILURES="org.gnome.Calculator"
+    cat > "${FIXTURES}/tybe.preinstall" <<'EOF'
+[Flatpak Preinstall org.gnome.Calculator]
+Branch=stabel
+EOF
+    run bash "${SCRIPT}" "${FIXTURES}"
+    [ "${status}" -eq 1 ]
+    [[ "${output}" == *"FAIL: ${FIXTURES}/tybe.preinstall: org.gnome.Calculator//stabel: not on flathub (exit 42)"* ]]
+    # The command line in the failure output shows the exact APP//BRANCH ref.
+    run grep -c '^remote-info --user flathub org.gnome.Calculator//stabel$' "${CALLS}"
     [ "${output}" = "1" ]
 }
 
