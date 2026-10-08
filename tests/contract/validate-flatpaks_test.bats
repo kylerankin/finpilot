@@ -69,6 +69,30 @@ EOF
     [[ "${output}" == *"PASS: ${FIXTURES}/base.preinstall: org.gnome.TextEditor (stable)"* ]]
 }
 
+@test "validator fails closed on an empty Branch= value" {
+    # Regression: an empty `Branch=` used to satisfy /^Branch=/ and pass,
+    # letting flatpak resolve against the remote default branch instead of
+    # failing closed. See projectbluefin/finpilot#504.
+    cat > "${FIXTURES}/base.preinstall" <<'EOF'
+[Flatpak Preinstall org.gnome.Calculator]
+Branch=
+EOF
+    run bash "${SCRIPT}" "${FIXTURES}"
+    [ "${status}" -eq 1 ]
+    [[ "${output}" == *"FAIL: ${FIXTURES}/base.preinstall: org.gnome.Calculator: missing Branch= key"* ]]
+}
+
+@test "validator fails closed on a whitespace-only Branch= value" {
+    cat > "${FIXTURES}/base.preinstall" <<'EOF'
+[Flatpak Preinstall org.gnome.Calculator]
+Branch=
+EOF
+    printf 'Branch=   \n' >> "${FIXTURES}/base.preinstall"
+    run bash "${SCRIPT}" "${FIXTURES}"
+    [ "${status}" -eq 1 ]
+    [[ "${output}" == *"FAIL: ${FIXTURES}/base.preinstall: org.gnome.Calculator: missing Branch= key"* ]]
+}
+
 @test "validator fails when an app is not on flathub" {
     export MOCK_REMOTE_FAILURES="com.example.Missing"
     cat > "${FIXTURES}/base.preinstall" <<'EOF'

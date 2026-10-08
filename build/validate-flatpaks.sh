@@ -7,7 +7,8 @@
 #     <app-id>] header, or a key=value pair, which is the shape GKeyFile
 #     accepts; flatpak logs anything else at g_info level and then discards the
 #     whole file, so malformed syntax looks identical to an empty list
-#   - every [Flatpak Preinstall <app-id>] section must declare a Branch= key
+#   - every [Flatpak Preinstall <app-id>] section must declare a non-empty
+#     Branch= key (an empty one fails closed, never resolves on the remote)
 #   - every declared app-id must resolve on the flathub remote
 #
 # Single implementation of the flatpak validation contract; the CI workflow
@@ -73,7 +74,10 @@ main() (
         while IFS= read -r app_id; do
             branch=$(awk -v app="${app_id}" '
                 $0 == "[Flatpak Preinstall " app "]" {found=1; next}
-                found && /^Branch=/ {print; valid=1; exit}
+                # Fail closed: require a non-empty value. An empty `Branch=`
+                # (or whitespace-only) must not satisfy the check, or flatpak
+                # resolves against the remote default branch instead of failing.
+                found && /^Branch=[^[:space:]]/ {print; valid=1; exit}
                 found && /^\[/ {exit}
                 END {if (!valid) print "MISSING"}
             ' "${preinstall}")
