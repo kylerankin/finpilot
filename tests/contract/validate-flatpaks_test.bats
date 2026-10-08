@@ -26,9 +26,8 @@ case "$1" in
     remote-info)
         # $1=remote-info $2=--user $3=flathub $4=APP_ID//BRANCH
         [[ $# -eq 4 ]] || exit 99
-        app_id="${4%%//*}"
         case " ${MOCK_REMOTE_FAILURES:-} " in
-            *" ${app_id}"*)
+            *" $4 "*)
                 echo 'error: remote-info failed' >&2
                 exit 42
                 ;;
@@ -71,7 +70,7 @@ EOF
 }
 
 @test "validator fails when an app is not on flathub" {
-    export MOCK_REMOTE_FAILURES="com.example.Missing"
+    export MOCK_REMOTE_FAILURES="com.example.Missing//stable"
     cat > "${FIXTURES}/base.preinstall" <<'EOF'
 [Flatpak Preinstall com.example.Missing]
 Branch=stable
@@ -109,13 +108,19 @@ EOF
 @test "validator fails a typo'd Branch= that does not exist on flathub" {
     # Regression for: remote-info queried with a bare app-id fell back to the
     # remote's default branch and printed PASS for a branch that never resolves.
-    export MOCK_REMOTE_FAILURES="org.gnome.Calculator"
+    # Only the typo'd ref is missing; the same app on //stable resolves.
+    export MOCK_REMOTE_FAILURES="org.gnome.Calculator//stabel"
+    cat > "${FIXTURES}/good.preinstall" <<'EOF'
+[Flatpak Preinstall org.gnome.Calculator]
+Branch=stable
+EOF
     cat > "${FIXTURES}/tybe.preinstall" <<'EOF'
 [Flatpak Preinstall org.gnome.Calculator]
 Branch=stabel
 EOF
     run bash "${SCRIPT}" "${FIXTURES}"
     [ "${status}" -eq 1 ]
+    [[ "${output}" == *"PASS: ${FIXTURES}/good.preinstall: org.gnome.Calculator (stable)"* ]]
     [[ "${output}" == *"FAIL: ${FIXTURES}/tybe.preinstall: org.gnome.Calculator//stabel: not on flathub (exit 42)"* ]]
     # The command line in the failure output shows the exact APP//BRANCH ref.
     run grep -c '^remote-info --user flathub org.gnome.Calculator//stabel$' "${CALLS}"

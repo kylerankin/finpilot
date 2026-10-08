@@ -8,7 +8,6 @@
 #     accepts; flatpak logs anything else at g_info level and then discards the
 #     whole file, so malformed syntax looks identical to an empty list
 #   - every [Flatpak Preinstall <app-id>] section must declare a Branch= key
-#   - every [Flatpak Preinstall <app-id>] section must declare a Branch= key
 #   - every declared app-id and Branch= must resolve on the flathub remote:
 #     the exact APP//BRANCH ref is looked up (a bare app-id falls back to the
 #     remote's default branch, so a typo'd or beta-only Branch= would PASS)
