@@ -84,8 +84,15 @@ main() (
                 printf 'FAIL: %s: %s: missing Branch= key\n' "${preinstall}" "${app_id}" >&2
                 continue
             fi
-            checked=$((checked + 1))
             branch_name="${branch#Branch=}"
+            # An empty Branch= would make the lookup `APP//`, which flatpak
+            # resolves against the default branch and so would falsely PASS.
+            if [[ -z "${branch_name}" ]]; then
+                failed=$((failed + 1))
+                printf 'FAIL: %s: %s: empty Branch= key\n' "${preinstall}" "${app_id}" >&2
+                continue
+            fi
+            checked=$((checked + 1))
             # Look up the exact ref the preinstall will request (APP//BRANCH).
             # A bare app-id makes `flatpak remote-info` fall back to the remote's
             # default branch, so a typo'd or beta-only Branch= prints PASS while
