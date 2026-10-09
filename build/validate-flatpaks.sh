@@ -7,7 +7,8 @@
 #     <app-id>] header, or a key=value pair, which is the shape GKeyFile
 #     accepts; flatpak logs anything else at g_info level and then discards the
 #     whole file, so malformed syntax looks identical to an empty list
-#   - every [Flatpak Preinstall <app-id>] section must declare a Branch= key
+#   - every [Flatpak Preinstall <app-id>] section must declare a non-empty
+#     Branch= key (an empty one fails closed, never resolves on the remote)
 #   - every declared app-id must resolve on the flathub remote
 #
 # Single implementation of the flatpak validation contract; the CI workflow
@@ -73,9 +74,22 @@ main() (
         while IFS= read -r app_id; do
             branch=$(awk -v app="${app_id}" '
                 $0 == "[Flatpak Preinstall " app "]" {found=1; next}
-                found && /^Branch=/ {print; valid=1; exit}
+                # GKeyFile strips the whitespace around the key and the "="
+                # before comparing, so `Branch = stable` is the key Branch,
+                # and for a duplicate key the LAST value wins. Keep the last
+                # Branch= whose value is non-empty after that same stripping;
+                # an empty/whitespace-only value fails closed, and so does a
+                # Branch= that appears but whose last value is empty. See
+                # projectbluefin/finpilot#509.
+                found && /^[[:space:]]*Branch[[:space:]]*=/ {
+                    val = $0
+                    sub(/^[^=]*=/, "", val)
+                    gsub(/^[[:space:]]+|[[:space:]]+$/, "", val)
+                    branch = val
+                    valid = 1
+                }
                 found && /^\[/ {exit}
-                END {if (!valid) print "MISSING"}
+                END {if (!valid || branch == "") print "MISSING"; else print branch}
             ' "${preinstall}")
             if [[ "${branch}" == "MISSING" ]]; then
                 failed=$((failed + 1))

@@ -69,6 +69,70 @@ EOF
     [[ "${output}" == *"PASS: ${FIXTURES}/base.preinstall: org.gnome.TextEditor (stable)"* ]]
 }
 
+@test "validator fails closed on an empty Branch= value" {
+    # Regression: an empty `Branch=` used to satisfy /^Branch=/ and pass,
+    # letting flatpak resolve against the remote default branch instead of
+    # failing closed. See projectbluefin/finpilot#504.
+    cat > "${FIXTURES}/base.preinstall" <<'EOF'
+[Flatpak Preinstall org.gnome.Calculator]
+Branch=
+EOF
+    run bash "${SCRIPT}" "${FIXTURES}"
+    [ "${status}" -eq 1 ]
+    [[ "${output}" == *"FAIL: ${FIXTURES}/base.preinstall: org.gnome.Calculator: missing Branch= key"* ]]
+}
+
+@test "validator fails closed on a whitespace-only Branch= value" {
+    cat > "${FIXTURES}/base.preinstall" <<'EOF'
+[Flatpak Preinstall org.gnome.Calculator]
+Branch=
+EOF
+    printf 'Branch=   \n' >> "${FIXTURES}/base.preinstall"
+    run bash "${SCRIPT}" "${FIXTURES}"
+    [ "${status}" -eq 1 ]
+    [[ "${output}" == *"FAIL: ${FIXTURES}/base.preinstall: org.gnome.Calculator: missing Branch= key"* ]]
+}
+
+@test "validator accepts key-side whitespace around the = (GKeyFile strips it)" {
+    # GKeyFile strips the whitespace around the key and the `=` before
+    # comparing, so `Branch = stable` is the key Branch and must not be
+    # reported as missing. See projectbluefin/finpilot#509.
+    cat > "${FIXTURES}/base.preinstall" <<'EOF'
+[Flatpak Preinstall org.gnome.Calculator]
+Branch = stable
+EOF
+    run bash "${SCRIPT}" "${FIXTURES}"
+    [ "${status}" -eq 0 ]
+    [[ "${output}" == *"PASS: ${FIXTURES}/base.preinstall: org.gnome.Calculator (stable)"* ]]
+}
+
+@test "validator takes the last Branch= of a duplicate (GKeyFile last-wins)" {
+    # For a duplicate key GKeyFile uses the last value, not the first, so the
+    # later `Branch=stable` must win over the earlier `Branch=old`. See
+    # projectbluefin/finpilot#509.
+    cat > "${FIXTURES}/base.preinstall" <<'EOF'
+[Flatpak Preinstall org.gnome.Calculator]
+Branch=old
+Branch=stable
+EOF
+    run bash "${SCRIPT}" "${FIXTURES}"
+    [ "${status}" -eq 0 ]
+    [[ "${output}" == *"PASS: ${FIXTURES}/base.preinstall: org.gnome.Calculator (stable)"* ]]
+}
+
+@test "validator fails closed when the last of duplicate Branch= is empty" {
+    # GKeyFile last-wins also means an empty final value fails closed, even
+    # though an earlier value was non-empty. See projectbluefin/finpilot#509.
+    cat > "${FIXTURES}/base.preinstall" <<'EOF'
+[Flatpak Preinstall org.gnome.Calculator]
+Branch=stable
+Branch=
+EOF
+    run bash "${SCRIPT}" "${FIXTURES}"
+    [ "${status}" -eq 1 ]
+    [[ "${output}" == *"FAIL: ${FIXTURES}/base.preinstall: org.gnome.Calculator: missing Branch= key"* ]]
+}
+
 @test "validator fails when an app is not on flathub" {
     export MOCK_REMOTE_FAILURES="com.example.Missing"
     cat > "${FIXTURES}/base.preinstall" <<'EOF'
