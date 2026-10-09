@@ -77,14 +77,14 @@ main() (
                 # GKeyFile strips the whitespace around the key and the "="
                 # before comparing, so `Branch = stable` is the key Branch,
                 # and for a duplicate key the LAST value wins. Keep the last
-                # Branch= whose value is non-empty after that same stripping;
-                # an empty/whitespace-only value fails closed, and so does a
-                # Branch= that appears but whose last value is empty. See
+                # Branch= unconditionally, stripping only leading whitespace from
+                # the value (GKeyFile preserves trailing whitespace). END
+                # fails closed if that last value is empty. See
                 # projectbluefin/finpilot#509.
                 found && /^[[:space:]]*Branch[[:space:]]*=/ {
                     val = $0
                     sub(/^[^=]*=/, "", val)
-                    gsub(/^[[:space:]]+|[[:space:]]+$/, "", val)
+                    sub(/^[[:space:]]+/, "", val)
                     branch = val
                     valid = 1
                 }
@@ -98,7 +98,7 @@ main() (
             fi
             checked=$((checked + 1))
             if flatpak remote-info --user flathub "${app_id}" > "${workdir}/output" 2>&1; then
-                printf 'PASS: %s: %s (%s)\n' "${preinstall}" "${app_id}" "${branch#Branch=}"
+                printf 'PASS: %s: %s (%s)\n' "${preinstall}" "${app_id}" "${branch}"
             else
                 rc=$?
                 failed=$((failed + 1))

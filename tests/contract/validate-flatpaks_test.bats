@@ -3,8 +3,8 @@
 #
 # All runs use a fake flatpak binary, never the host's. The contract under
 # test: every line must be blank, a '#' comment, a [Flatpak Preinstall <app-id>]
-# header, or a key=value pair; every such section must declare Branch=; every
-# app-id is passed to `flatpak remote-info` as data; and an empty discovery
+# header, or a key=value pair; every such section must declare a non-empty
+# Branch= (an empty one fails closed); every app-id is passed to `flatpak remote-info` as data; and an empty discovery
 # result fails closed instead of passing vacuously.
 #
 # Run with: bats tests/contract/validate-flatpaks_test.bats
@@ -104,6 +104,15 @@ EOF
     run bash "${SCRIPT}" "${FIXTURES}"
     [ "${status}" -eq 0 ]
     [[ "${output}" == *"PASS: ${FIXTURES}/base.preinstall: org.gnome.Calculator (stable)"* ]]
+}
+
+@test "validator preserves trailing whitespace in the Branch= value (GKeyFile does)" {
+    # GKeyFile strips only leading whitespace from the value, so
+    # `Branch=stable ` names the branch "stable ", not "stable".
+    printf '[Flatpak Preinstall org.gnome.Calculator]\nBranch=stable \n' > "${FIXTURES}/base.preinstall"
+    run bash "${SCRIPT}" "${FIXTURES}"
+    [ "${status}" -eq 0 ]
+    [[ "${output}" == *"PASS: ${FIXTURES}/base.preinstall: org.gnome.Calculator (stable )"* ]]
 }
 
 @test "validator takes the last Branch= of a duplicate (GKeyFile last-wins)" {
