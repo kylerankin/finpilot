@@ -8,7 +8,8 @@
 #     accepts; flatpak logs anything else at g_info level and then discards the
 #     whole file, so malformed syntax looks identical to an empty list
 #   - every [Flatpak Preinstall <app-id>] section must declare a non-empty
-#     Branch= key (an empty one fails closed, never resolves on the remote)
+#     Branch= key (an empty one fails closed: flatpak would resolve it to an
+#     ambiguous remote default branch)
 #   - every declared app-id must resolve on the flathub remote
 #
 # Single implementation of the flatpak validation contract; the CI workflow
@@ -77,7 +78,8 @@ main() (
                 # Fail closed: require a non-empty value. An empty `Branch=`
                 # (or whitespace-only) yields an ambiguous preinstall ref, so
                 # reject it rather than accept a branch the validator cannot name.
-                found && /^Branch=[^[:space:]]/ {print; valid=1; exit}
+                # Leading whitespace is allowed because GKeyFile strips it.
+                found && /^Branch=[[:space:]]*[^[:space:]]/ {sub(/^Branch=[[:space:]]*/, "Branch="); print; valid=1; exit}
                 found && /^\[/ {exit}
                 END {if (!valid) print "MISSING"}
             ' "${preinstall}")
