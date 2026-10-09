@@ -75,15 +75,15 @@ main() (
             branch=$(awk -v app="${app_id}" '
                 $0 == "[Flatpak Preinstall " app "]" {found=1; next}
                 # Fail closed: require a non-empty value. An empty `Branch=`
-                # (or whitespace-only) must not satisfy the check, or flatpak
-                # resolves against the remote default branch instead of failing.
+                # (or whitespace-only) yields an ambiguous preinstall ref, so
+                # reject it rather than accept a branch the validator cannot name.
                 found && /^Branch=[^[:space:]]/ {print; valid=1; exit}
                 found && /^\[/ {exit}
                 END {if (!valid) print "MISSING"}
             ' "${preinstall}")
             if [[ "${branch}" == "MISSING" ]]; then
                 failed=$((failed + 1))
-                printf 'FAIL: %s: %s: missing Branch= key\n' "${preinstall}" "${app_id}" >&2
+                printf 'FAIL: %s: %s: missing or empty Branch= value\n' "${preinstall}" "${app_id}" >&2
                 continue
             fi
             checked=$((checked + 1))
