@@ -97,6 +97,14 @@ EOF
     [[ "${output}" == *"PASS: ${FIXTURES}/base.preinstall: org.gnome.Calculator (stable)"* ]]
 }
 
+@test "validator fails closed on a Branch= value with trailing whitespace" {
+    printf '[Flatpak Preinstall org.gnome.Calculator]\nBranch=stable  \n' > "${FIXTURES}/base.preinstall"
+    run bash "${SCRIPT}" "${FIXTURES}"
+    [ "${status}" -eq 1 ]
+    [[ "${output}" == *"FAIL: ${FIXTURES}/base.preinstall: org.gnome.Calculator: trailing whitespace in Branch= value"* ]]
+    ! grep -q '^remote-info' "${CALLS}"
+}
+
 @test "validator fails when an app is not on flathub" {
     export MOCK_REMOTE_FAILURES="com.example.Missing"
     cat > "${FIXTURES}/base.preinstall" <<'EOF'

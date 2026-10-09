@@ -79,13 +79,23 @@ main() (
                 # (or whitespace-only) yields an ambiguous preinstall ref, so
                 # reject it rather than accept a branch the validator cannot name.
                 # Leading whitespace is allowed because GKeyFile strips it.
-                found && /^Branch=[[:space:]]*[^[:space:]]/ {sub(/^Branch=[[:space:]]*/, "Branch="); print; valid=1; exit}
+                # Trailing whitespace is rejected: GKeyFile keeps it, so the
+                # branch name flatpak requests would not match the remote.
+                found && /^Branch=[[:space:]]*[^[:space:]]/ {
+                    if ($0 ~ /[[:space:]]$/) {print "TRAILING"; valid=1; exit}
+                    sub(/^Branch=[[:space:]]*/, "Branch="); print; valid=1; exit
+                }
                 found && /^\[/ {exit}
                 END {if (!valid) print "MISSING"}
             ' "${preinstall}")
             if [[ "${branch}" == "MISSING" ]]; then
                 failed=$((failed + 1))
                 printf 'FAIL: %s: %s: missing or empty Branch= value\n' "${preinstall}" "${app_id}" >&2
+                continue
+            fi
+            if [[ "${branch}" == "TRAILING" ]]; then
+                failed=$((failed + 1))
+                printf 'FAIL: %s: %s: trailing whitespace in Branch= value\n' "${preinstall}" "${app_id}" >&2
                 continue
             fi
             checked=$((checked + 1))
