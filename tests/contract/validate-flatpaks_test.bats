@@ -4,7 +4,8 @@
 # All runs use a fake flatpak binary, never the host's. The contract under
 # test: every line must be blank, a '#' comment, a [Flatpak Preinstall <app-id>]
 # header, or a key=value pair; every such section must declare Branch=; every
-# app-id is passed to `flatpak remote-info` as data; and an empty discovery
+# app-id is passed to `flatpak remote-info` as data, and the Branch= value is
+# passed as --branch so a non-existent branch fails; and an empty discovery
 # result fails closed instead of passing vacuously.
 #
 # Run with: bats tests/contract/validate-flatpaks_test.bats
@@ -24,12 +25,26 @@ case "$1" in
     remote-add)
         ;;
     remote-info)
-        # $1=remote-info $2=--user $3=flathub $4=app-id
-        [[ $# -eq 4 ]] || exit 99
+        # last arg is the app-id; `--branch <value>` is the branch being
+        # verified against the remote.
+        app="${@: -1}"
+        branch=""
+        for ((i = 1; i < $#; i++)); do
+            if [[ "${!i}" == "--branch" ]]; then
+                j=$((i + 1))
+                branch="${!j}"
+            fi
+        done
         case " ${MOCK_REMOTE_FAILURES:-} " in
-            *" $4 "*)
+            *" $app "*)
                 echo 'error: remote-info failed' >&2
                 exit 42
+                ;;
+        esac
+        case " ${MOCK_BRANCH_FAILURES:-} " in
+            *" $branch "*)
+                echo 'error: No remote refs found for branch' >&2
+                exit 43
                 ;;
         esac
         ;;
@@ -92,7 +107,7 @@ EOF
     [[ "${output}" == *"Flatpak directory does not exist"* ]]
 }
 
-@test "validator ensures the flathub remote and passes app-ids as data" {
+@test "validator ensures the flathub remote and passes the branch as data" {
     cat > "${FIXTURES}/base.preinstall" <<'EOF'
 [Flatpak Preinstall org.gnome.Calculator]
 Branch=stable
@@ -101,8 +116,23 @@ EOF
     [ "${status}" -eq 0 ]
     run grep -c '^remote-add --user --if-not-exists flathub ' "${CALLS}"
     [ "${output}" = "1" ]
-    run grep -c '^remote-info --user flathub org.gnome.Calculator$' "${CALLS}"
+    run grep -c '^remote-info --user flathub --branch stable org.gnome.Calculator$' "${CALLS}"
     [ "${output}" = "1" ]
+}
+
+@test "validator fails when the Branch value does not exist on the remote" {
+    # Regression (projectbluefin/finpilot#508): Branch= was only echoed in the
+    # PASS line, so a non-empty but nonexistent branch such as Branch=nope
+    # passed. remote-info is now called with --branch, so a missing branch
+    # fails instead of resolving against the remote default.
+    export MOCK_BRANCH_FAILURES="stable"
+    cat > "${FIXTURES}/base.preinstall" <<'EOF'
+[Flatpak Preinstall org.gnome.Calculator]
+Branch=stable
+EOF
+    run bash "${SCRIPT}" "${FIXTURES}"
+    [ "${status}" -eq 1 ]
+    [[ "${output}" == *"FAIL: ${FIXTURES}/base.preinstall: org.gnome.Calculator: not on flathub (exit 43)"* ]]
 }
 
 @test "validator accepts blank lines and # comments" {
