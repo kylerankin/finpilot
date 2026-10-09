@@ -3,7 +3,7 @@
 #
 # All runs use a fake flatpak binary, never the host's. The contract under
 # test: every line must be blank, a '#' comment, a [Flatpak Preinstall <app-id>]
-# header, or a key=value pair; every such section must declare Branch=; every
+# header, or a key=value pair; every such section must declare a non-empty Branch=; every
 # app-id is passed to `flatpak remote-info` as data; and an empty discovery
 # result fails closed instead of passing vacuously.
 #
@@ -64,22 +64,22 @@ Branch=stable
 EOF
     run bash "${SCRIPT}" "${FIXTURES}"
     [ "${status}" -eq 1 ]
-    [[ "${output}" == *"FAIL: ${FIXTURES}/base.preinstall: org.gnome.Calculator: missing Branch= key"* ]]
+    [[ "${output}" == *"FAIL: ${FIXTURES}/base.preinstall: org.gnome.Calculator: missing or empty Branch= value"* ]]
     # The well-formed app in the same file is still checked and reported.
     [[ "${output}" == *"PASS: ${FIXTURES}/base.preinstall: org.gnome.TextEditor (stable)"* ]]
 }
 
 @test "validator fails closed on an empty Branch= value" {
     # Regression: an empty `Branch=` used to satisfy /^Branch=/ and pass,
-    # letting flatpak resolve against the remote default branch instead of
-    # failing closed. See projectbluefin/finpilot#504.
+    # yielding an ambiguous preinstall ref rather than failing closed.
+    # See projectbluefin/finpilot#504.
     cat > "${FIXTURES}/base.preinstall" <<'EOF'
 [Flatpak Preinstall org.gnome.Calculator]
 Branch=
 EOF
     run bash "${SCRIPT}" "${FIXTURES}"
     [ "${status}" -eq 1 ]
-    [[ "${output}" == *"FAIL: ${FIXTURES}/base.preinstall: org.gnome.Calculator: missing Branch= key"* ]]
+    [[ "${output}" == *"FAIL: ${FIXTURES}/base.preinstall: org.gnome.Calculator: missing or empty Branch= value"* ]]
 }
 
 @test "validator fails closed on a whitespace-only Branch= value" {
@@ -90,7 +90,7 @@ EOF
     printf 'Branch=   \n' >> "${FIXTURES}/base.preinstall"
     run bash "${SCRIPT}" "${FIXTURES}"
     [ "${status}" -eq 1 ]
-    [[ "${output}" == *"FAIL: ${FIXTURES}/base.preinstall: org.gnome.Calculator: missing Branch= key"* ]]
+    [[ "${output}" == *"FAIL: ${FIXTURES}/base.preinstall: org.gnome.Calculator: missing or empty Branch= value"* ]]
 }
 
 @test "validator fails when an app is not on flathub" {
