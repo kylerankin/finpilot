@@ -83,14 +83,18 @@ EOF
 }
 
 @test "validator fails closed on a whitespace-only Branch= value" {
-    cat > "${FIXTURES}/base.preinstall" <<'EOF'
-[Flatpak Preinstall org.gnome.Calculator]
-Branch=
-EOF
-    printf 'Branch=   \n' >> "${FIXTURES}/base.preinstall"
+    printf '[Flatpak Preinstall org.gnome.Calculator]\nBranch=   \n' > "${FIXTURES}/base.preinstall"
     run bash "${SCRIPT}" "${FIXTURES}"
     [ "${status}" -eq 1 ]
     [[ "${output}" == *"FAIL: ${FIXTURES}/base.preinstall: org.gnome.Calculator: missing or empty Branch= value"* ]]
+}
+
+@test "validator accepts a Branch= value with leading whitespace" {
+    # GKeyFile strips leading whitespace from values, so flatpak accepts this.
+    printf '[Flatpak Preinstall org.gnome.Calculator]\nBranch= stable\n' > "${FIXTURES}/base.preinstall"
+    run bash "${SCRIPT}" "${FIXTURES}"
+    [ "${status}" -eq 0 ]
+    [[ "${output}" == *"PASS: ${FIXTURES}/base.preinstall: org.gnome.Calculator (stable)"* ]]
 }
 
 @test "validator fails when an app is not on flathub" {
