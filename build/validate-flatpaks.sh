@@ -73,13 +73,34 @@ main() (
         while IFS= read -r app_id; do
             branch=$(awk -v app="${app_id}" '
                 $0 == "[Flatpak Preinstall " app "]" {found=1; next}
-                found && /^Branch=/ {print; valid=1; exit}
+                # Fail closed on anything GKeyFile/flatpak cannot resolve:
+                #   - empty or whitespace-only value  -> MISSING
+                #   - value with surrounding whitespace -> WHITESPACE
+                #     `Branch=stable  ` used to pass and print as-is, so flatpak
+                #     would resolve a branch literally named "stable  ". See #507
+                found && /^Branch=/ {
+                    val = substr($0, 8)          # everything after "Branch="
+                    if (val ~ /^[[:space:]]*$/)
+                        print "MISSING"
+                    else if (val ~ /^[[:space:]]/ || val ~ /[[:space:]]$/)
+                        print "WHITESPACE"
+                    else {
+                        print
+                        valid=1
+                    }
+                    done=1
+                    exit
+                }
                 found && /^\[/ {exit}
-                END {if (!valid) print "MISSING"}
+                END {if (!done) print "MISSING"}
             ' "${preinstall}")
             if [[ "${branch}" == "MISSING" ]]; then
                 failed=$((failed + 1))
                 printf 'FAIL: %s: %s: missing Branch= key\n' "${preinstall}" "${app_id}" >&2
+                continue
+            elif [[ "${branch}" == "WHITESPACE" ]]; then
+                failed=$((failed + 1))
+                printf 'FAIL: %s: %s: Branch= value has leading or trailing whitespace\n' "${preinstall}" "${app_id}" >&2
                 continue
             fi
             checked=$((checked + 1))

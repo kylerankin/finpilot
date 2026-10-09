@@ -69,6 +69,51 @@ EOF
     [[ "${output}" == *"PASS: ${FIXTURES}/base.preinstall: org.gnome.TextEditor (stable)"* ]]
 }
 
+@test "validator fails closed on an empty Branch= value" {
+    # An empty `Branch=` must not satisfy the check and let flatpak resolve
+    # against the remote default branch instead of failing closed.
+    {
+        echo '[Flatpak Preinstall org.gnome.Calculator]'
+        echo 'Branch='
+    } > "${FIXTURES}/base.preinstall"
+    run bash "${SCRIPT}" "${FIXTURES}"
+    [ "${status}" -eq 1 ]
+    [[ "${output}" == *"FAIL: ${FIXTURES}/base.preinstall: org.gnome.Calculator: missing Branch= key"* ]]
+}
+
+@test "validator fails closed on a whitespace-only Branch= value" {
+    {
+        echo '[Flatpak Preinstall org.gnome.Calculator]'
+        printf 'Branch=   \n'
+    } > "${FIXTURES}/base.preinstall"
+    run bash "${SCRIPT}" "${FIXTURES}"
+    [ "${status}" -eq 1 ]
+    [[ "${output}" == *"FAIL: ${FIXTURES}/base.preinstall: org.gnome.Calculator: missing Branch= key"* ]]
+}
+
+@test "validator fails closed on a Branch= value with trailing whitespace" {
+    # Regression (projectbluefin/finpilot#507): trailing whitespace after the
+    # branch name passed and was printed as-is, so flatpak would resolve a
+    # branch literally named "stable  " (with the trailing space).
+    {
+        echo '[Flatpak Preinstall org.gnome.Calculator]'
+        printf 'Branch=stable  \n'
+    } > "${FIXTURES}/base.preinstall"
+    run bash "${SCRIPT}" "${FIXTURES}"
+    [ "${status}" -eq 1 ]
+    [[ "${output}" == *"FAIL: ${FIXTURES}/base.preinstall: org.gnome.Calculator: Branch= value has leading or trailing whitespace"* ]]
+}
+
+@test "validator fails closed on a Branch= value with leading whitespace" {
+    {
+        echo '[Flatpak Preinstall org.gnome.Calculator]'
+        printf 'Branch= stable\n'
+    } > "${FIXTURES}/base.preinstall"
+    run bash "${SCRIPT}" "${FIXTURES}"
+    [ "${status}" -eq 1 ]
+    [[ "${output}" == *"FAIL: ${FIXTURES}/base.preinstall: org.gnome.Calculator: Branch= value has leading or trailing whitespace"* ]]
+}
+
 @test "validator fails when an app is not on flathub" {
     export MOCK_REMOTE_FAILURES="com.example.Missing"
     cat > "${FIXTURES}/base.preinstall" <<'EOF'
