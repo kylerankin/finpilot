@@ -3,7 +3,7 @@
 #
 # All runs use a fake flatpak binary, never the host's. The contract under
 # test: every line must be blank, a '#' comment, a [Flatpak Preinstall <app-id>]
-# header, or a key=value pair; every such section must declare Branch=; every
+# header, or a key=value pair; every such section must declare a non-empty Branch=; every
 # app-id and its branch is passed to `flatpak remote-info` as APP//BRANCH data;
 # and an empty discovery result fails closed instead of passing vacuously.
 #
@@ -67,6 +67,24 @@ EOF
     [[ "${output}" == *"FAIL: ${FIXTURES}/base.preinstall: org.gnome.Calculator: missing Branch= key"* ]]
     # The well-formed app in the same file is still checked and reported.
     [[ "${output}" == *"PASS: ${FIXTURES}/base.preinstall: org.gnome.TextEditor (stable)"* ]]
+}
+
+@test "validator fails closed on an empty Branch= key" {
+    # `APP//` with no branch resolves against flathub's default branch, so an
+    # empty Branch= must fail here rather than reach remote-info and PASS.
+    cat > "${FIXTURES}/base.preinstall" <<'EOF'
+[Flatpak Preinstall org.gnome.Calculator]
+Branch=
+[Flatpak Preinstall org.gnome.TextEditor]
+Branch=stable
+EOF
+    run bash "${SCRIPT}" "${FIXTURES}"
+    [ "${status}" -eq 1 ]
+    [[ "${output}" == *"FAIL: ${FIXTURES}/base.preinstall: org.gnome.Calculator: empty Branch= key"* ]]
+    [[ "${output}" == *"PASS: ${FIXTURES}/base.preinstall: org.gnome.TextEditor (stable)"* ]]
+    [[ "${output}" == *"1 app checks, 1 failures."* ]]
+    run grep -c '^remote-info .*org.gnome.Calculator' "${CALLS}"
+    [ "${output}" = "0" ]
 }
 
 @test "validator fails when an app is not on flathub" {
