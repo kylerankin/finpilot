@@ -9,7 +9,9 @@
 #     whole file, so malformed syntax looks identical to an empty list
 #   - every [Flatpak Preinstall <app-id>] section must declare a non-empty
 #     Branch= key (an empty one fails closed, never resolves on the remote)
-#   - every declared app-id must resolve on the flathub remote
+#   - every declared app-id must resolve on the flathub remote at its declared
+#     branch (queried as <app-id>//<branch>, so a malformed or unpublished
+#     branch fails instead of passing on the app-id alone)
 #
 # Single implementation of the flatpak validation contract; the CI workflow
 # (.github/workflows/validate-flatpaks.yml) and `just validate-flatpaks` are
@@ -97,13 +99,14 @@ main() (
                 continue
             fi
             checked=$((checked + 1))
-            if flatpak remote-info --user flathub "${app_id}" > "${workdir}/output" 2>&1; then
+            ref="${app_id}//${branch}"
+            if flatpak remote-info --user flathub "${ref}" > "${workdir}/output" 2>&1; then
                 printf 'PASS: %s: %s (%s)\n' "${preinstall}" "${app_id}" "${branch}"
             else
                 rc=$?
                 failed=$((failed + 1))
-                printf 'FAIL: %s: %s: not on flathub (exit %s)\n' "${preinstall}" "${app_id}" "${rc}" >&2
-                printf 'Command: flatpak remote-info --user flathub %q\n' "${app_id}" >&2
+                printf 'FAIL: %s: %s: not on flathub at branch %q (exit %s)\n' "${preinstall}" "${app_id}" "${branch}" "${rc}" >&2
+                printf 'Command: flatpak remote-info --user flathub %q\n' "${ref}" >&2
                 sed 's/^/  /' "${workdir}/output" >&2
             fi
         done < <(sed -n 's/^\[Flatpak Preinstall \(.*\)\]$/\1/p' "${preinstall}")

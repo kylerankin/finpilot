@@ -4,7 +4,8 @@
 # All runs use a fake flatpak binary, never the host's. The contract under
 # test: every line must be blank, a '#' comment, a [Flatpak Preinstall <app-id>]
 # header, or a key=value pair; every such section must declare a non-empty
-# Branch= (an empty one fails closed); every app-id is passed to `flatpak remote-info` as data; and an empty discovery
+# Branch= (an empty one fails closed); every app-id is passed to
+# `flatpak remote-info` as data, as <app-id>//<branch>; and an empty discovery
 # result fails closed instead of passing vacuously.
 #
 # Run with: bats tests/contract/validate-flatpaks_test.bats
@@ -24,10 +25,15 @@ case "$1" in
     remote-add)
         ;;
     remote-info)
-        # $1=remote-info $2=--user $3=flathub $4=app-id
-        [[ $# -eq 4 ]] || exit 99
+        # $1=remote-info $2=--user $3=flathub $4=<app-id>//<branch>
+        [[ $# -eq 4 && "$4" == *//* ]] || exit 99
+        # Like flatpak's ref parser, reject a branch containing whitespace.
+        if [[ "${4#*//}" =~ [[:space:]] ]]; then
+            echo "error: Invalid branch ${4#*//}" >&2
+            exit 1
+        fi
         case " ${MOCK_REMOTE_FAILURES:-} " in
-            *" $4 "*)
+            *" ${4%%//*} "*)
                 echo 'error: remote-info failed' >&2
                 exit 42
                 ;;
@@ -108,11 +114,14 @@ EOF
 
 @test "validator preserves trailing whitespace in the Branch= value (GKeyFile does)" {
     # GKeyFile strips only leading whitespace from the value, so
-    # `Branch=stable ` names the branch "stable ", not "stable".
+    # `Branch=stable ` names the branch "stable ", not "stable", which flatpak
+    # cannot resolve. The branch is checked on the remote, so it fails.
     printf '[Flatpak Preinstall org.gnome.Calculator]\nBranch=stable \n' > "${FIXTURES}/base.preinstall"
     run bash "${SCRIPT}" "${FIXTURES}"
-    [ "${status}" -eq 0 ]
-    [[ "${output}" == *"PASS: ${FIXTURES}/base.preinstall: org.gnome.Calculator (stable )"* ]]
+    [ "${status}" -eq 1 ]
+    [[ "${output}" == *"FAIL: ${FIXTURES}/base.preinstall: org.gnome.Calculator: not on flathub at branch stable\\ "* ]]
+    run grep -c '^remote-info --user flathub org.gnome.Calculator//stable $' "${CALLS}"
+    [ "${output}" = "1" ]
 }
 
 @test "validator takes the last Branch= of a duplicate (GKeyFile last-wins)" {
@@ -150,7 +159,7 @@ Branch=stable
 EOF
     run bash "${SCRIPT}" "${FIXTURES}"
     [ "${status}" -eq 1 ]
-    [[ "${output}" == *"FAIL: ${FIXTURES}/base.preinstall: com.example.Missing: not on flathub (exit 42)"* ]]
+    [[ "${output}" == *"FAIL: ${FIXTURES}/base.preinstall: com.example.Missing: not on flathub at branch stable (exit 42)"* ]]
 }
 
 @test "validator fails closed when the directory has no preinstall files" {
@@ -174,7 +183,7 @@ EOF
     [ "${status}" -eq 0 ]
     run grep -c '^remote-add --user --if-not-exists flathub ' "${CALLS}"
     [ "${output}" = "1" ]
-    run grep -c '^remote-info --user flathub org.gnome.Calculator$' "${CALLS}"
+    run grep -c '^remote-info --user flathub org.gnome.Calculator//stable$' "${CALLS}"
     [ "${output}" = "1" ]
 }
 
