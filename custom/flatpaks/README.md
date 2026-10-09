@@ -25,8 +25,9 @@ Two gotchas:
 
 - The parser is GKeyFile. Comments must start with `#`; a `;` line is a syntax
   error, and flatpak discards the entire file when one line is malformed.
-- `just validate-flatpaks` checks every section for a `Branch=` key and confirms
-  the app exists on Flathub. CI runs it too.
+- `just validate-flatpaks` checks every section declares a non-empty `Branch=`
+  key and confirms the exact `APP//BRANCH` ref exists on Flathub — a wrong or
+  typo'd branch now fails. CI runs it too.
 
 ## Adding one
 
