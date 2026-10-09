@@ -4,9 +4,9 @@
 # All runs use a fake flatpak binary, never the host's. The contract under
 # test: every line must be blank, a '#' comment, a [Flatpak Preinstall <app-id>]
 # header, or a key=value pair; every such section must declare Branch=; every
-# app-id is passed to `flatpak remote-info` as data, and the Branch= value is
-# passed as --branch so a non-existent branch fails; and an empty discovery
-# result fails closed instead of passing vacuously.
+# app-id is passed to `flatpak remote-info` as data, and the Branch= value
+# is appended to the app ref as APP//BRANCH so a non-existent branch fails;
+# and an empty discovery result fails closed instead of passing vacuously.
 #
 # Run with: bats tests/contract/validate-flatpaks_test.bats
 
@@ -25,18 +25,14 @@ case "$1" in
     remote-add)
         ;;
     remote-info)
-        # last arg is the app-id; `--branch <value>` is the branch being
-        # verified against the remote.
+        # last arg is the app ref (APP//BRANCH); the branch is everything
+        # after the final "//". A nonexistent branch is simulated via
+        # MOCK_BRANCH_FAILURES.
         app="${@: -1}"
-        branch=""
-        for ((i = 1; i < $#; i++)); do
-            if [[ "${!i}" == "--branch" ]]; then
-                j=$((i + 1))
-                branch="${!j}"
-            fi
-        done
+        app_id="${app%%//*}"
+        branch="${app##*//}"
         case " ${MOCK_REMOTE_FAILURES:-} " in
-            *" $app "*)
+            *" ${app_id} "*)
                 echo 'error: remote-info failed' >&2
                 exit 42
                 ;;
@@ -116,7 +112,7 @@ EOF
     [ "${status}" -eq 0 ]
     run grep -c '^remote-add --user --if-not-exists flathub ' "${CALLS}"
     [ "${output}" = "1" ]
-    run grep -c '^remote-info --user flathub --branch stable org.gnome.Calculator$' "${CALLS}"
+    run grep -c '^remote-info --user flathub org.gnome.Calculator//stable$' "${CALLS}"
     [ "${output}" = "1" ]
 }
 

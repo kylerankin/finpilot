@@ -85,17 +85,16 @@ main() (
                 continue
             fi
             checked=$((checked + 1))
-            # Pass the Branch= value to remote-info so a non-empty but
-            # nonexistent branch fails here instead of resolving against the
-            # remote's default branch and passing. The branch was already
-            # required to be non-empty, so this only guards against a typo.
-            if flatpak remote-info --user flathub --branch "${branch#Branch=}" "${app_id}" > "${workdir}/output" 2>&1; then
+            # Pass the Branch= value in the app ref (APP//BRANCH) so a
+            # non-empty but nonexistent branch fails here instead of
+            # resolving against the remote's default branch and passing.
+            if flatpak remote-info --user flathub "${app_id}//${branch#Branch=}" > "${workdir}/output" 2>&1; then
                 printf 'PASS: %s: %s (%s)\n' "${preinstall}" "${app_id}" "${branch#Branch=}"
             else
                 rc=$?
                 failed=$((failed + 1))
                 printf 'FAIL: %s: %s: not on flathub (exit %s)\n' "${preinstall}" "${app_id}" "${rc}" >&2
-                printf 'Command: flatpak remote-info --user flathub --branch %q %q\n' "${branch#Branch=}" "${app_id}" >&2
+                printf 'Command: flatpak remote-info --user flathub %q\n' "${app_id}//${branch#Branch=}" >&2
                 sed 's/^/  /' "${workdir}/output" >&2
             fi
         done < <(sed -n 's/^\[Flatpak Preinstall \(.*\)\]$/\1/p' "${preinstall}")
